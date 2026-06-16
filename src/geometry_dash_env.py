@@ -71,7 +71,7 @@ class GeometryDashEnv(gym.Env):
         info = {"player_pos": player_pos, "obstacles_ahead": obstacles_ahead, "features": normalized_features}
         return observation, info
 
-
+    """
     def step(self, action):
         self.steps += 1
         self.executor.act(action) # perform the action
@@ -129,7 +129,61 @@ class GeometryDashEnv(gym.Env):
         if terminated:
             print(f"Episode reward: {self.episode_reward:.2f}")
         return observation, reward, terminated, truncated, info # gymnasium format
+    """
 
+    def step(self, action):
+        accumulated_reward = 0.0
+        terminated = False
+        frame = None
+        
+        # --- 1. BUCLE DE FRAME SKIPPING (Repetir 4 veces) ---
+        for _ in range(4):
+            self.steps += 1
+            self.executor.act(action) # Mantiene o pulsa la tecla
+            
+            # OJO AQUÍ: He bajado el sleep. Antes tenías 0.05 (50ms).
+            # Si haces 50ms x 4 veces = 200ms de retraso. ¡El juego iría a tirones!
+            # 0.015s (~15ms) da margen al juego para avanzar el frame físico.
+            time.sleep(0.015) 
+            
+            # Capturamos pantalla (Esto es MUY rápido porque aún no usa YOLO)
+            frame = self.cap.capture_and_preprocess() 
+            self.last_frame = frame
+            
+            # Comprobamos si ha muerto en este frame intermedio
+            terminated = self.check_death(frame)
+            
+            if terminated:
+                accumulated_reward += 0.0
+                self.executor.act(0) # Soltamos la tecla si muere
+                break # Rompemos el bucle, ¡no hace falta seguir!
+            else:
+                accumulated_reward += 1.0
+
+        # --- 2. LLAMADA A YOLO (Solo 1 vez al final) ---
+        # start_time = time.time()
+        detections = self.detector.detect(frame) # YOLO mira el ÚLTIMO frame
+        # infer_ms = (time.time() - start_time) * 1000.0
+        # self.last_infer_ms = infer_ms
+        # print(f"YOLO inference {infer_ms:.1f}ms")
+
+        player_pos, obstacles_ahead, normalized_features = self.extractor.extract(detections)
+
+        # Formateo del estado (igual que lo tenías)
+        observation = np.array(normalized_features["state_vector"], dtype=np.float32).flatten()
+        observation = np.clip(observation, 0.0, 1.0)
+        self.current_state = observation 
+
+        info = {"player_pos": player_pos, "obstacles_ahead": obstacles_ahead, "features": normalized_features}
+        truncated = False 
+
+        # --- 3. ACTUALIZACIÓN DE RECOMPENSAS ---
+        self.episode_reward += accumulated_reward
+        if terminated:
+            print(f"Episode reward: {self.episode_reward:.2f}")
+            
+        return observation, accumulated_reward, terminated, truncated, info
+    
 
     def check_death(self, frame):
         menu_template = cv.imread("data/images/menu.png", 0)
@@ -161,7 +215,6 @@ class GeometryDashEnv(gym.Env):
         
         threshold = 0.6
         is_dead = best_menu_match > threshold or best_restart_match > threshold
-        print(f"Estoy muerto: {is_dead}")
         if is_dead or self.steps % 50 == 0:
             print(f"Menu match: {best_menu_match:.2f}, Restart match: {best_restart_match:.2f}")
         return is_dead

@@ -14,7 +14,7 @@ register(
 def train():
     # 1. Create the environment
     env = gym.make('GeometryDash-v0')
-    model_path = "./models/gd_ppo_final.zip"
+    model_path = "./models/gd_ppo_imitation.zip"
 
     # 2. Setup directory to save models
     log_dir = "./logs/"
@@ -57,12 +57,13 @@ def train():
             total_timesteps=50000, 
             callback=checkpoint_callback,
             progress_bar=True,
-            reset_num_timesteps=False
+            reset_num_timesteps=False,
+            tb_log_name="PPO_4"
         )
     except KeyboardInterrupt:
         print("Training interrupted by user. Saving current progress...")
     finally:
-        model.save(f"{model_dir}/gd_ppo_final")
+        model.save(f"{model_dir}/gd_ppo_final_w_imitation")
         env.close()
         print("Final model saved. Environment closed.")
 

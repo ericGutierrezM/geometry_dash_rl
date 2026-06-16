@@ -10,6 +10,8 @@ dependencies = [
     "pyautogui>=0.9.54",
     "pydirectinput>=1.0.4",
     "pynput>=1.8.2",
+    "stable-baselines3>=2.8.0",
+    "tensorboard>=2.20.0",
     "ultralytics>=8.4.67",
 ]
 
