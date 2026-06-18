@@ -137,7 +137,7 @@ class GeometryDashEnv(gym.Env):
         frame = None
         
         # --- 1. BUCLE DE FRAME SKIPPING (Repetir 4 veces) ---
-        for _ in range(4):
+        for _ in range(2):
             self.steps += 1
             self.executor.act(action) # Mantiene o pulsa la tecla
             
